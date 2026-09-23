@@ -1,0 +1,5 @@
+# Environment files (never commit real secrets)
+backend/.env
+
+# Docker persistent data
+docker/pgdata/
