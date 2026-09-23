@@ -25,6 +25,7 @@ class WelfareProgram(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     type = Column(
         Enum(WelfareProgramType, name="welfare_program_type", native_enum=True),
         nullable=False,
+        index=True,
     )
     eligibility = Column(String(500), nullable=True)
     enrolled_count = Column(Integer, nullable=False, default=0)
@@ -32,6 +33,7 @@ class WelfareProgram(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(WelfareProgramStatus, name="welfare_program_status", native_enum=True),
         nullable=False,
         default=WelfareProgramStatus.DRAFT,
+        index=True,
     )
 
     def __repr__(self):

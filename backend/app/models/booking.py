@@ -41,31 +41,36 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
     worker_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workers.id", ondelete="SET NULL"),
         nullable=True,  # can be null for unassigned emergency bookings
+        index=True,
     )
     service_id = Column(
         UUID(as_uuid=True),
         ForeignKey("service_categories.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     # ── Type & status ───────────────────────────────────────────────────────
     type = Column(
         Enum(BookingType, name="booking_type", native_enum=True),
         nullable=False,
+        index=True,
     )
     status = Column(
         Enum(BookingStatus, name="booking_status", native_enum=True),
         nullable=False,
         default=BookingStatus.PENDING,
+        index=True,
     )
 
     # ── Scheduling ──────────────────────────────────────────────────────────
-    scheduled_at = Column(DateTime(timezone=True), nullable=True)
+    scheduled_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     # ── Address (flattened from mobile's address{} object) ──────────────────
     address_text = Column(String(500), nullable=True)

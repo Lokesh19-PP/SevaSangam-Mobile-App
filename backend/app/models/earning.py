@@ -30,11 +30,13 @@ class Earning(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("workers.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
     booking_id = Column(
         UUID(as_uuid=True),
         ForeignKey("bookings.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     # ── Earning data ────────────────────────────────────────────────────────
@@ -43,8 +45,9 @@ class Earning(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(PaymentStatus, name="payment_status", native_enum=True, create_constraint=False),
         nullable=False,
         default=PaymentStatus.PENDING,
+        index=True,
     )
-    date = Column(Date, nullable=False)
+    date = Column(Date, nullable=False, index=True)
 
     # ── Relationships ────────────────────────────────────────────────────────
     worker = relationship("Worker", foreign_keys=[worker_id])

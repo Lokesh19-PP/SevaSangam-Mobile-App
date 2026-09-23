@@ -38,11 +38,13 @@ class Review(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
     worker_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workers.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
 
     # ── Review data ─────────────────────────────────────────────────────────

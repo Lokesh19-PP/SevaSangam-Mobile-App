@@ -34,16 +34,19 @@ class Complaint(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     booking_id = Column(
         UUID(as_uuid=True),
         ForeignKey("bookings.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     worker_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workers.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # ── Complaint data ──────────────────────────────────────────────────────
@@ -53,6 +56,7 @@ class Complaint(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(ComplaintStatus, name="complaint_status", native_enum=True),
         nullable=False,
         default=ComplaintStatus.OPEN,
+        index=True,
     )
     resolution_note = Column(Text, nullable=True)
 

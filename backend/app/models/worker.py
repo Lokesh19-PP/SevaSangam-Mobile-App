@@ -46,6 +46,7 @@ class Worker(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("cooperatives.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # ── Profile ─────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ class Worker(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     experience_years = Column(Integer, nullable=False, default=0)
 
     # ── Ratings ─────────────────────────────────────────────────────────────
-    rating = Column(Float, nullable=False, default=0.0)
+    rating = Column(Float, nullable=False, default=0.0, index=True)
     rating_count = Column(Integer, nullable=False, default=0)
 
     # ── Status ──────────────────────────────────────────────────────────────
@@ -61,11 +62,13 @@ class Worker(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(VerificationStatus, name="verification_status", native_enum=True),
         nullable=False,
         default=VerificationStatus.PENDING,
+        index=True,
     )
     availability = Column(
         Enum(WorkerAvailability, name="worker_availability", native_enum=True),
         nullable=False,
         default=WorkerAvailability.OFFLINE,
+        index=True,
     )
 
     # ── Geo ──────────────────────────────────────────────────────────────────

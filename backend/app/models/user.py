@@ -23,6 +23,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     role = Column(
         Enum(UserRole, name="user_role", native_enum=True),
         nullable=False,
+        index=True,
     )
     name = Column(String(255), nullable=False)
     phone = Column(String(15), nullable=False, unique=True)  # Indian +91 format

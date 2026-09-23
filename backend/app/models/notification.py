@@ -29,13 +29,14 @@ class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     # ── Notification data ────────────────────────────────────────────────────
     type = Column(String(50), nullable=False)     # e.g. "booking_update", "emergency", "verification"
     title_key = Column(String(100), nullable=False)  # i18n key
     body = Column(Text, nullable=True)
-    read = Column(Boolean, nullable=False, default=False)
+    read = Column(Boolean, nullable=False, default=False, index=True)
 
     # ── Relationships ────────────────────────────────────────────────────────
     user = relationship("User", foreign_keys=[user_id])

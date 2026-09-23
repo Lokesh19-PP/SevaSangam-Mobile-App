@@ -28,6 +28,7 @@ class Certificate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True),
         ForeignKey("workers.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     # ── Certificate data ─────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ class Certificate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(CertificateStatus, name="certificate_status", native_enum=True),
         nullable=False,
         default=CertificateStatus.PENDING,
+        index=True,
     )
     review_note = Column(Text, nullable=True)
 
