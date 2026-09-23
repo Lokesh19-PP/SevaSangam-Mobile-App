@@ -1,0 +1,392 @@
+# SevaSangam Mobile App — Antigravity Master Context
+
+> Place this file at: `docs/ANTIGRAVITY_MOBILE_CONTEXT.md`
+> **Paste this file's content as the FIRST message in every Antigravity session that touches the mobile app**, before any member-specific task prompt.
+> `docs/ANTIGRAVITY_CONTEXT.md` (the web/backend context) describes the same product and is provided for background. **The mobile app is a separate application with its own codebase**, built with React Native. Product/domain rules come from the web context; **mobile technology, structure and rules come from this file.** If the two conflict, flag the conflict instead of silently picking one.
+
+---
+
+## 0. Instructions to Antigravity (read first)
+
+1. Treat this document as the source of truth for the mobile app. Do not contradict it, and do not contradict another member's work.
+2. **Only work inside `mobile/`** (and `docs/` when asked). Never modify `backend/`, `frontend/` (the web app) or `docker/` from a mobile task. If a mobile task needs a backend change, don't make it — write it down as an "API request" in `docs/api/MOBILE_API_REQUESTS.md`.
+3. The mobile app is **standalone**: it must never import from `frontend/`. Where the web app already has something useful (mock data shapes, locale keys, design tokens), **copy it and keep names/shapes consistent** — don't depend on it.
+4. Do not add libraries, change the stack, or restructure folders without saying so and explaining why. If something in the stack is blocked (e.g. a library doesn't work in Expo Go), propose an alternative and wait for confirmation.
+5. Stay inside the scope of the task prompt you were given. Do not "helpfully" build screens that belong to another member or another role.
+6. Everything runs on **mock data** first. Never wire real Firebase/Auth0, real push, real Twilio, real payments or real map keys unless the task explicitly says so.
+7. **Reuse-first:** this project deliberately reuses the existing SevaSangam stack and architecture patterns (section 4). Prefer the existing approach over a "better" new library or pattern.
+8. After finishing a task, output: (a) files created/changed, (b) how to run/test it, (c) anything left as a stub/TODO, (d) any assumption you made.
+
+---
+
+## 1. What we're building
+
+**SevaSangam** — *"Trusted Services. Fair Opportunities. Stronger Communities."*
+
+A cooperative-owned digital service marketplace (SIH Problem Statement 26089, Ministry of Cooperation / NCCT) that connects customers with **verified workers from Labour Cooperative Societies** — electricians, plumbers, carpenters, domestic help, caregivers, drivers, gardeners, cleaners, technicians.
+
+The **SevaSangam mobile app** delivers the **complete platform on a phone**: the Customer, Worker **and Cooperative Administrator** dashboards all live in one React Native app. It talks to the **same FastAPI backend and database** as the web platform, so data stays consistent across both.
+
+This is explicitly **NOT an Urban Company clone**. The differentiators must stay visible in the mobile UX:
+
+- **Fair job distribution** among cooperative workers (not just nearest/highest-rated). Workers see their own fair-share status; admins see distribution and utilisation analytics; customers are told matching is cooperative-fair.
+- **Worker welfare & insurance visibility** — on worker profiles (customer view), the worker's own welfare card, and admin welfare-programme management.
+- **AI-based smart matching** balancing skill + distance + availability + rating + **current workload** (customer just sees "best match" with a reason; the logic is backend-only).
+- **AI demand forecasting** — admin analytics screens *display* forecasts produced by the backend.
+- **Emergency / on-demand booking** — one-tap, location-aware; the flagship mobile feature.
+- **Geo-matching via PostGIS** (backend) — mobile supplies GPS coordinates and renders results.
+- **Multilingual** — English, Hindi, Marathi to start.
+
+## 2. Design intent for mobile
+
+- **Workers are field workers.** Mid/low-end Android phones, patchy connectivity, sometimes limited literacy or English. Worker screens must be **icon-driven, large-touch-target, few-tap, multilingual, and tolerant of poor connectivity.**
+- **Customers need speed in emergencies.** Emergency booking must be reachable in **≤ 2 taps from Home** and auto-capture location.
+- **Admins are managing on the move.** Cooperative administrators need to verify workers, watch bookings, handle complaints and read analytics from a phone. Admin screens must be **triage-first**: the most urgent items (pending verifications, unassigned emergencies, open complaints) surface first; tables become cards/lists; charts are simple and legible on a small screen.
+- **Trust is the product.** Cooperative badge, verified badge, ratings, insurance/welfare indicators must be prominent and consistent.
+- **Android-first** (largest user base in India). iOS works because we use React Native/Expo, but we don't optimise for it first.
+
+## 3. Three roles / three dashboards (all on mobile)
+
+1. **Customer** — browse services, find nearby workers, book, schedule, emergency request, track, history, ratings.
+2. **Worker** — profile, skills, certifications, availability, accept/reject jobs, active job, earnings, ratings, welfare card.
+3. **Cooperative Administrator** — verify workers & certificates, monitor bookings, workforce utilisation & fair distribution, complaints, analytics, welfare programmes.
+
+**One app, three completely separated experiences.** After login, `RootNavigator` sends the user to the Customer, Worker or Admin navigator based on their role. These three experiences must be **completely separated** — separate navigators, separate `screens/` folders, separate role-specific components/hooks. **No customer UI may leak into worker or admin screens, and vice versa.** The only things shared are the design system (`components/ui`, `components/common`), shared infrastructure (theme, i18n, services, native wrappers, auth) and neutral shared components (`components/charts`, `components/maps`, `components/forms`).
+
+**Role rules:**
+
+- Customers and Workers can **self-register** (role chosen at sign-up).
+- **Admin accounts can never self-register.** They are pre-provisioned by the cooperative/backend; the sign-up `RoleSelect` screen only offers Customer and Worker. The backend returns the role after authentication.
+- A **Worker** who isn't `verified` sees a `WorkerAccountStatus` screen (pending / rejected / suspended) instead of the Worker dashboard.
+- Route guards live in `RootNavigator`; a screen must never assume the role — the navigator decides.
+
+## 4. Tech stack (reuse-first — do not substitute without team agreement)
+
+**Guiding principle: reuse the existing SevaSangam stack everywhere possible.** The mobile app adds only what a phone genuinely requires. Nothing about the backend, database, AI, integrations or auth-provider choice changes because of mobile. The mobile app is **React Native** — the same React mental model, the same JavaScript, the same Tailwind classes, the same hooks/context/service-layer architecture as the web app.
+
+### 4.1 Final mobile stack
+
+Legend: ✅ same as the existing SevaSangam stack · 🔁 mobile equivalent of a web tool
+
+| Layer | Choice | vs. web |
+| ----- | ------ | ------- |
+| Language | **JavaScript (ES2020+) — no TypeScript** | ✅ |
+| UI library | **React Native** via **Expo** (managed workflow, latest stable SDK). Functional components, hooks, Context only | ✅ same React patterns |
+| Dev tooling | Expo CLI + Metro; **Expo Go** for daily dev; **EAS Build** for shareable APK/demo builds | 🔁 replaces Vite |
+| Styling | **Tailwind CSS via NativeWind v4** — same utility-class approach; mobile `tailwind.config.js` copies the web design tokens (colors, fonts, radius, spacing) | ✅ / 🔁 |
+| Navigation | **React Navigation** (native-stack + bottom-tabs + optional drawer/“More” screen), role-guarded | 🔁 replaces React Router |
+| State management | **React Context + hooks** (no Redux) | ✅ |
+| API layer | `services/api/*.js → apiClient.js → mock/mockApi.js` — same architecture, same signature discipline | ✅ |
+| HTTP client | Same choice as the web `apiClient.js` (fetch or axios) — never introduce a second one | ✅ |
+| i18n | **i18next + react-i18next**, `locales/{en,hi,mr}.json` | ✅ |
+| Icons | **lucide-react-native** (needs `react-native-svg`) if web uses Lucide; otherwise `@expo/vector-icons` | ✅ / 🔁 |
+| Charts (admin analytics, worker earnings) | `react-native-svg`-based charts (e.g. `react-native-gifted-charts`), verified to run in Expo Go; fallback = simple custom SVG bars | 🔁 replaces web chart lib |
+| Maps / geo (client) | `react-native-maps` + `expo-location`; **PostGIS stays 100 % on the backend** | 🔁 |
+| Auth | **Firebase Authentication (phone OTP)** — same provider family as web, same RBAC (customer/worker/admin). If the web team finalises **Auth0** instead, mobile follows Auth0 (needs an Expo dev client — flag before starting) | ✅ |
+| Backend | **FastAPI + Pydantic REST** (`/api/v1`) — unchanged, shared with web | ✅ |
+| Database | **PostgreSQL + PostGIS** — unchanged, backend-only | ✅ |
+| AI / ML | **Scikit-learn** matching + forecasting, **OpenCV + Tesseract** OCR — unchanged, in `backend/app/ai/`. **The mobile app contains zero AI logic**; it only calls endpoints and displays results | ✅ |
+| SMS / WhatsApp | **Twilio** — backend `integrations/` only. Mobile never talks to Twilio | ✅ |
+| Payments (MVP) | **Mock/modular only** — `pending` / `paid` / `cash`. Razorpay/UPI later | ✅ |
+| Deployment | Backend: **Docker** (same). Mobile: Expo Go for demos, **EAS Build** for a shareable APK. (Vercel is web-only, not used) | 🔁 |
+
+### 4.2 Mobile-only additions (the *only* new dependencies allowed without discussion)
+
+| Package | Why it exists | Web equivalent |
+| ------- | ------------- | -------------- |
+| `react-native-safe-area-context`, `react-native-screens` | Required by React Navigation | — |
+| `expo-location` | GPS for emergency / nearby | browser Geolocation |
+| `expo-image-picker` | Profile photo & certificate upload (OCR stays on backend) | `<input type="file">` |
+| `expo-secure-store` | Auth token storage | localStorage / cookies |
+| `expo-notifications` | Push (FCM) — **stub first** | — |
+| `@react-native-community/netinfo` | Offline banner | `navigator.onLine` |
+| `react-native-maps` | Map rendering | web map component |
+| `expo-linking` | Dial a number / open maps app | `<a href="tel:">` |
+| `react-native-svg` (+ chart lib) | Icons and charts | web chart lib |
+
+Anything not in 4.1 or 4.2 needs team approval before being added.
+
+### 4.3 What "reuse" means here
+
+The mobile app is standalone, so reuse means **same technologies, same architecture, same API contract, same data shapes, same translation keys, same design tokens** — not importing web code.
+
+| Web concept | Mobile equivalent |
+| ----------- | ----------------- |
+| `div/span/p/button/img/input` | `View/Text/Pressable/Image/TextInput` |
+| React Router routes + guards | React Navigation navigators + role-based `RootNavigator` |
+| Tailwind classes on DOM | NativeWind classes on RN components (no `hover:`, no CSS grid, no `float`) |
+| `localStorage` | `expo-secure-store` (token) / in-memory context |
+| `import.meta.env.VITE_*` | `process.env.EXPO_PUBLIC_*`, read only in `src/config/env.js` |
+| Browser geolocation / file input / `tel:` | `services/native/*` wrappers |
+| Sidebar / top nav / data tables | Bottom tabs + stack headers + card lists |
+
+**Tailwind version caveat:** NativeWind v4 works with **Tailwind v3** configs. If the web app is on Tailwind v4, copy the token *values* manually into the mobile `tailwind.config.js` rather than importing the web config.
+
+## 5. Golden rules (apply to every task, every member)
+
+**Inherited from the existing SevaSangam rules (still apply):**
+
+- JavaScript only — no TypeScript.
+- UI components/screens must **never** call mock data or APIs directly. Always:
+  `Screen → hook → services/api/*.js → apiClient.js → mock/mockApi.js`
+  (later swapped to FastAPI with the **same call signature** — swapping must require changing only `apiClient.js`/env, not screens or hooks).
+- Business logic never lives inside screens/components — it lives in **hooks** (or pure functions in `utils/`).
+- **AI/analytics logic never lives on the device.** Matching, fairness scores, utilisation numbers and demand forecasts are computed by the backend; mobile displays what the API returns. Mock APIs return pre-computed shapes.
+- Never hardcode secrets — `.env` + `.env.example` with placeholders only.
+- **No user-facing string is hardcoded** — everything goes through `src/i18n/locales/{en,hi,mr}.json` via `t('...')`: button labels, errors, empty states, chart labels, accessibility labels, toasts.
+- Keep it modular and simple — hackathon MVP, not a production fintech system.
+
+**Mobile-specific:**
+
+- **Native device APIs (location, camera/image picker, notifications, secure storage, linking/dialer) are only used through wrappers in `src/services/native/*.js`.** Screens and hooks import the wrapper, never the Expo module.
+- **Any `EXPO_PUBLIC_*` env variable is embedded in the app bundle and readable by anyone.** Never put a real secret in one.
+- **Env access only through `src/config/env.js`.** No other file reads `process.env`.
+- **Role separation is strict:** a file under `screens/customer/` never imports from `screens/worker/` or `screens/admin/` (and so on). Shared needs go into `components/ui`, `components/common`, `components/charts`, `components/maps`, `components/forms`, `utils/` or `hooks/shared/`.
+- **Every screen that loads data implements four states:** loading (skeleton/spinner), empty, error (with retry), success. List screens support pull-to-refresh.
+- **Every list API takes `page`, `limit` and filter params** (admin lists especially); the mock supports them and screens use `FlatList` with infinite scroll. Never `.map()` a long list inside a `ScrollView`.
+- **Minimum touch target 48×48 dp.** Minimum body font 14sp, respects system font scaling. Prefer icon + label over text-only for primary actions (worker literacy).
+- Use safe-area handling, `KeyboardAvoidingView`, and correct Android hardware-back behaviour.
+- Optimise for **low-end Android**: small/compressed images, no heavy animations, `memo`/`useCallback` where it matters, lazy-load heavy screens (admin analytics).
+- **Sensitive admin data:** never log PII, never persist admin lists to disk, keep the auth token only in secure storage, and clear all context state on logout.
+- Design tokens must **mirror the web design system** (`docs/design/` / web `tailwind.config`). Do not invent a new palette.
+- Currency ₹ (INR); dates/times formatted for `en-IN`; phone numbers Indian (+91) by default.
+- **Reuse before you write.** Before creating a service, hook, util, mock file or locale key, check whether it already exists in the mobile app (or in the web app, in which case mirror its names/shape).
+- **Portable layers stay platform-free:** `services/api/`, `apiClient.js`, `mockApi.js`, `mock/`, data hooks and `utils/` must not import `react-native` or `expo-*` (only `services/native/` and UI code may).
+
+## 6. Folder structure (target — build toward this)
+
+```
+SevaSangam/
+├── backend/            ← backend team's work — DO NOT TOUCH from mobile tasks
+├── frontend/           ← web app — DO NOT TOUCH from mobile tasks
+├── docker/             ← DO NOT TOUCH
+├── docs/
+│   ├── ANTIGRAVITY_CONTEXT.md          ← web/backend context (background)
+│   ├── ANTIGRAVITY_MOBILE_CONTEXT.md   ← this file
+│   ├── api/MOBILE_API_REQUESTS.md      ← where mobile devs log needed backend changes
+│   └── mobile/DEMO_ACCOUNTS.md         ← mock logins for every role/state
+└── mobile/
+    ├── app.config.js               ← Expo config (reads env)
+    ├── App.js                      ← providers + RootNavigator ONLY
+    ├── babel.config.js / metro.config.js / tailwind.config.js (NativeWind)
+    ├── package.json
+    ├── .env.example
+    ├── assets/                     ← icon, splash, images, fonts
+    └── src/
+        ├── theme/                  ← colors, typography, spacing, radius (mirrors web tokens)
+        ├── config/                 ← env.js (the ONLY place env vars are read)
+        ├── components/
+        │   ├── ui/                 ← Button, Input, Card, Badge, Chip, Avatar, Skeleton, Toast, Modal, Tabs...
+        │   ├── common/             ← Header, EmptyState, ErrorState, LoadingState, OfflineBanner, LanguageSwitcher, ScreenWrapper, StatusBadge
+        │   ├── forms/              ← OtpInput, AddressForm, ScheduleForm, RatingForm, FilterSheet
+        │   ├── charts/             ← BarChart, LineChart, DonutChart, KpiCard, TrendSparkline (shared, SVG-based)
+        │   ├── maps/               ← MapView wrapper, LocationPicker, TrackingMap (placeholder fallback)
+        │   ├── customer/           ← role-specific: WorkerCard, ServiceCategoryCard, BookingCard, EmergencyButton...
+        │   ├── worker/             ← role-specific: JobRequestCard, EarningCard, AvailabilityToggle, WelfareCard...
+        │   └── admin/              ← role-specific: VerificationCard, CertificateViewer, ComplaintCard, FairnessGauge, BookingRow...
+        ├── navigation/
+        │   ├── RootNavigator.js       ← Auth / Customer / Worker / WorkerAccountStatus / Admin
+        │   ├── AuthNavigator.js
+        │   ├── CustomerNavigator.js   ← bottom tabs + nested stacks
+        │   ├── WorkerNavigator.js     ← bottom tabs + nested stacks
+        │   └── AdminNavigator.js      ← bottom tabs + nested stacks (+ "More")
+        └── routes.js              ← route-name constants (no magic strings)
+        ├── screens/
+        │   ├── auth/               ← Splash, LanguageSelect, Onboarding, Login, VerifyOtp, RoleSelect, WorkerAccountStatus
+        │   ├── customer/           ← see section 8
+        │   ├── worker/             ← see section 9
+        │   ├── admin/              ← see section 10
+        │   └── shared/             ← Notifications, Settings, Help, NotFound
+        ├── context/                ← AuthContext, LanguageContext, LocationContext, NotificationContext
+        ├── hooks/
+        │   ├── shared/             ← useAuth, useLocation, useNetwork, useNotifications, usePagination...
+        │   ├── customer/           ← useServices, useWorkers, useBooking, useEmergency, useTracking...
+        │   ├── worker/             ← useAvailability, useJobRequests, useActiveJob, useEarnings, useWelfare...
+        │   └── admin/              ← useVerificationQueue, useAdminBookings, useUtilization, useComplaints, useAnalytics, useWelfarePrograms...
+        ├── services/
+        │   ├── api/                ← authApi, servicesApi, workersApi, bookingsApi, emergencyApi, reviewsApi,
+        │   │                          jobsApi, earningsApi, profileApi, notificationsApi,
+        │   │                          adminWorkersApi, adminBookingsApi, complaintsApi, analyticsApi, welfareApi
+        │   ├── apiClient.js        ← single switch point: mock now, FastAPI later
+        │   └── native/             ← location.js, imagePicker.js, notifications.js, secureStorage.js, linking.js
+        ├── mock/
+        │   ├── data/               ← users, services, workers, cooperatives, bookings, jobs, earnings, reviews,
+        │   │                          certificates, complaints, welfarePrograms, analytics, notifications
+        │   └── mockApi.js          ← simulated latency + same response shapes as backend + pagination/filter support
+        ├── i18n/
+        │   ├── index.js
+        │   └── locales/{en,hi,mr}.json   ← namespaces: common, auth, customer, worker, admin, errors, status
+        └── utils/                  ← formatters (₹, date, distance), validators, constants, statusHelpers
+```
+
+## 7. Data flow & the mock-first contract
+
+```
+Screen  →  hook  →  services/api/xxxApi.js  →  apiClient.js  →  mock/mockApi.js   (now)
+                                                            →  FastAPI REST        (later)
+```
+
+- Env vars are read **only** in `src/config/env.js`, which exports `{ USE_MOCK, API_BASE_URL, ... }`. `apiClient.js` imports from there. Flipping `EXPO_PUBLIC_USE_MOCK` to `false` is the only thing needed to move from mock to the real backend.
+- `mockApi.js` simulates **latency (300–800 ms)**, supports **pagination + filters + search** on list endpoints, and can inject **errors** (behind a dev flag) so loading/error states get tested.
+- **Response shapes must match the backend contract / web mock shapes.** Do not invent divergent field names. When unsure, follow the web mock (`frontend/src/mock/data/`) or the backend Pydantic schemas and note the assumption.
+- API base path `/api/v1`. Auth token sent as `Authorization: Bearer <token>`, stored via `services/native/secureStorage.js`.
+- **Role-based endpoints:** admin endpoints are namespaced (e.g. `/api/v1/admin/...`); the mock must reject admin calls made by non-admin sessions, same as the backend will.
+- **Dev networking gotcha:** Android emulator reaches the host at `http://10.0.2.2:8000`; a physical phone needs the laptop's LAN IP (`http://192.168.x.x:8000`) on the same Wi-Fi; `localhost` will NOT work. Document in `.env.example`.
+
+**Core entities (provisional — confirm against backend schemas; keep field names identical across all three roles):**
+
+| Entity | Key fields |
+| ------ | ---------- |
+| User | id, role (`customer`/`worker`/`admin`), name, phone, language, avatar |
+| Cooperative | id, name, region, memberCount, verified |
+| Worker | id, userId, cooperativeId, skills[], experienceYears, rating, ratingCount, verificationStatus, availability, location{lat,lng}, serviceRadiusKm, workloadThisWeek, insurance{status,coverage,validTill} |
+| Certificate | id, workerId, type, imageUrl, ocr{text,confidence}, status (`pending`/`approved`/`rejected`), reviewNote |
+| ServiceCategory | id, key, name (i18n key), icon, baseVisitCharge |
+| Booking | id, customerId, workerId, serviceId, type (`scheduled`/`emergency`), status, scheduledAt, address{text,lat,lng}, notes, priceEstimate, paymentMode, paymentStatus, matchReason, timeline[] |
+| Review | id, bookingId, customerId, workerId, stars, comment, tags[], createdAt |
+| Complaint | id, raisedBy, bookingId?, workerId?, category, description, status (`open`/`in_review`/`resolved`/`rejected`), resolutionNote, createdAt |
+| WelfareProgram | id, title, description, type (`insurance`/`health`/`training`/`other`), eligibility, enrolledCount, status (`active`/`draft`/`closed`) |
+| Earning | id, workerId, bookingId, amount, paymentStatus, date |
+| Notification | id, userId, type, titleKey, body, read, createdAt |
+
+**Provisional enums** (keep in one place, `utils/constants.js`):
+
+- Booking status: `pending → assigned → accepted → en_route → in_progress → completed`, plus `rejected`, `cancelled`, `unassigned` (emergency with no taker)
+- Booking type: `scheduled` | `emergency`
+- Payment status: `pending` | `paid` | `cash`
+- Worker verification: `pending` | `verified` | `rejected` | `suspended`
+- Worker availability: `available` | `busy` | `offline`
+
+## 8. Customer dashboard (screens & behaviour)
+
+**Navigation:** bottom tabs — **Home · Bookings · Notifications · Profile**, plus a prominent **Emergency** entry point on Home (and a floating SOS-style button).
+
+1. **Home** — greeting, search, service category grid (electrician, plumber, carpenter, domestic help, caregiver, driver, gardener, cleaner, technician), big **Emergency** CTA, "Nearby verified workers" horizontal list, active-booking banner.
+2. **Service category / Worker list** — filters (rating, distance, availability, cooperative), sort, "Best match" highlight with a short reason (e.g. "Skilled · Nearby · Available · Fair share"). `FlatList`.
+3. **Worker profile** — photo, name, skills, certifications, rating & reviews, distance, availability, **cooperative name + verified badge**, **welfare/insurance indicator**, visit charge, Book / Call.
+4. **Booking flow** (multi-step): service → address (GPS auto-fill + manual edit) → date/time (or "Now") → notes/photos → price estimate & payment mode (`pending`/`cash`; no gateway) → confirm.
+5. **Emergency request** — one tap: auto-detect location, pick service type, short description, confirm → "Finding the nearest available worker…" → assignment result. Degrade gracefully if GPS is denied (manual address).
+6. **Booking tracking / detail** — status timeline, worker card, mock live map with worker marker + ETA, contact worker (dialer via `linking.js`), cancel where allowed.
+7. **Booking history** — tabs Upcoming / Completed / Cancelled, reorder.
+8. **Rate & review** — stars + text + tags after completion.
+9. **Notifications**, **Profile** (saved addresses, language, logout), **Help / raise complaint** (creates a `Complaint` visible to admins).
+
+## 9. Worker dashboard (screens & behaviour)
+
+**Navigation:** bottom tabs — **Home · Jobs · Earnings · Profile** with a large, always-visible **Available / Offline toggle** on Home.
+
+1. **Worker Home** — availability toggle, today's summary (jobs, earnings), pending-request badge, **workload / fair-share indicator** (e.g. "3 jobs this week — you're in line for the next request"), shortcut to the active job.
+2. **Job requests** — card per request (service, distance, area, time, price, emergency tag) with **Accept / Reject** and an expiry countdown; rejecting asks for a short reason.
+3. **Active job** — step buttons: *On the way → Started → Completed*; navigate to customer (maps app via `linking.js`), call customer, mark cash received.
+4. **Job history & Earnings** — day/week/month totals, per-job breakdown, payment status (`pending`/`paid`/`cash`), simple chart.
+5. **Ratings & reviews** — average, distribution, recent comments.
+6. **Profile & skills** — edit skills, experience, service area; upload **certificates** via camera/gallery (upload stubbed; OCR verification is backend); shows verification status.
+7. **Welfare & insurance card** — cooperative name, membership ID, insurance status/coverage, welfare schemes (read-only mock).
+8. **WorkerAccountStatus** — if `pending` / `rejected` / `suspended`: shows status, reason, and (for pending/rejected) lets the worker edit profile and re-upload certificates; **cannot receive jobs**.
+9. **Notifications**, **Settings** (language, logout), **Help**.
+
+**Worker UX rules:** big buttons, icon + label, minimal typing, Hindi/Marathi first-class, no jargon, confirm destructive actions, accept a job in ≤ ~3 taps.
+
+## 10. Cooperative Administrator dashboard (screens & behaviour)
+
+**Navigation:** bottom tabs — **Overview · Workers · Bookings · Complaints · More**. "More" opens a list: **Fair Distribution & Utilisation · Analytics & Forecast · Welfare Programmes · Settings**. Admin lists are card-based with search + filter sheets; no wide tables.
+
+1. **Overview (home)** — KPI cards (bookings today, active workers, pending verifications, open complaints, emergency requests, average rating), plus an **"Needs attention"** list: unassigned emergency bookings, oldest pending verifications, escalated complaints. Every card deep-links to its list.
+2. **Worker verification queue** — pending workers list → **verification detail**: profile, skills, cooperative membership, and a **CertificateViewer** (zoomable image + backend OCR result text/confidence, mocked). Actions: **Approve / Reject (with required reason) / Request re-upload**. Bulk actions are out of scope.
+3. **Workers directory** — search + filters (skill, status, cooperative, availability); **worker detail** with stats, ratings, recent jobs, current workload, insurance status; actions: **suspend / reactivate**.
+4. **Bookings monitor** — filters (status, type = emergency, date, service, area); **booking detail** with full timeline, customer/worker cards, and the AI **match reason**; **manual reassign** action (mock) for `unassigned`/failed emergency bookings. Emergency bookings are visually highlighted.
+5. **Fair distribution & utilisation** *(flagship admin screen)* — displays backend-computed data: jobs-per-worker distribution chart, utilisation % (overall / per skill / per cooperative), a **fairness indicator** (gauge or score with plain-language explanation), lists of **under-utilised** and **over-loaded** workers with a "nudge/flag" action (mock). Device does no calculation.
+6. **Complaints** — list with status tabs (`open` / `in_review` / `resolved`), complaint detail (parties, booking link, description), actions: **start review, add note, resolve, reject**.
+7. **Analytics & forecast** — demand by service/area/time-of-day, bookings & ratings trends, earnings summary, and the **AI demand forecast** (next 7 days by category) rendered from the backend response. Date-range picker; simple, legible charts.
+8. **Welfare programmes** — list of programmes (insurance, health, training…), enrolment counts, worker insurance coverage overview; **create/edit programme** (title, description, eligibility, status) and **announce to workers** (mock).
+9. **Notifications** (e.g. new emergency, new verification request, new complaint — push stubbed), **Settings** (language, profile, logout).
+
+**Admin UX rules:** triage first, one primary action per screen, confirm every approve/reject/suspend/resolve action, always show *who/when* in audit-style timelines, keep layouts usable on larger phones and small tablets (max-width containers).
+
+## 11. Auth flow (mocked first)
+
+```
+Splash → LanguageSelect → Onboarding (first launch only) → Login (phone number)
+       → VerifyOtp (mock: any 6-digit code / fixed "123456")
+       → [first time, unknown user] RoleSelect (Customer | Worker) → profile setup
+       → RootNavigator routes by role/state:
+            customer                         → CustomerNavigator
+            worker (verified)                → WorkerNavigator
+            worker (pending/rejected/susp.)  → WorkerAccountStatus
+            admin (pre-provisioned)          → AdminNavigator
+```
+
+- Token + role kept in `AuthContext`; token persisted in secure storage; session restored on launch before the splash hides.
+- Admin sessions: shorter mock expiry, and all state is cleared on logout.
+- Provide mock demo accounts in `docs/mobile/DEMO_ACCOUNTS.md`: **1 customer, 1 verified worker, 1 pending worker, 1 suspended worker, 1 admin** — so any member can test every path.
+
+## 12. Multilingual (i18n)
+
+- Languages: **English (`en`), Hindi (`hi`), Marathi (`mr`)**.
+- Chosen on first launch, changeable in Settings, persisted locally, applied instantly without restart.
+- Namespaced keys: `common.*`, `auth.*`, `customer.*`, `worker.*`, `admin.*`, `errors.*`, `status.*`.
+- Missing keys fall back to English (never show raw keys).
+- Verify Devanagari rendering and that layouts (especially admin filter chips and chart labels) survive longer Hindi/Marathi strings.
+- Numbers/currency/dates via `utils/formatters.js`.
+
+## 13. Permissions & device features
+
+| Feature | Wrapper | Notes |
+| ------- | ------- | ----- |
+| Location | `services/native/location.js` | Clear rationale in the user's language; handle denied / services-off; foreground only (no background tracking in MVP). Used by Customer (emergency/nearby) and Worker (service area). Admin does not need it. |
+| Camera / gallery | `services/native/imagePicker.js` | Profile photo, certificate upload, complaint photo. Compress before upload. |
+| Push notifications | `services/native/notifications.js` | **Stub** first: register listener + local-notification mock. Real FCM later. |
+| Dialer / maps app | `services/native/linking.js` | Call worker/customer, open navigation. |
+| Secure storage | `services/native/secureStorage.js` | Auth token only. |
+
+Every wrapper exposes the same async API in real and mock mode and never crashes on denied permissions — it returns a well-defined result the UI can handle.
+
+## 14. Connectivity & resilience (MVP-level)
+
+- Non-blocking "You're offline" banner when the network is unavailable.
+- Cache last-fetched *non-sensitive* lists (services, own bookings/jobs) in memory so screens don't blank on brief drops. **Do not cache admin PII lists.**
+- Failed writes (accept job, status update, approve/reject worker, resolve complaint) show a clear error and a retry — never fail silently.
+- **Do not** build a full offline-sync engine now.
+
+## 15. Current repo state (as of last check)
+
+- `mobile/` **does not exist yet** — needs full scaffold (Expo blank JavaScript template, then the structure above).
+- The **web frontend** skeleton exists (mostly empty folders); the **backend** is being scaffolded in parallel by the backend team.
+- Mobile must therefore run **100 % on mock data**, be fully self-sufficient, and keep its service function signatures and entity shapes aligned with the backend contract as it emerges. Log any mismatches in `docs/api/MOBILE_API_REQUESTS.md`.
+
+## 16. Team & branches (proposed — edit to match reality)
+
+| Member | Branch | Owns (mobile) |
+| ------ | ------ | ------------- |
+| Janhvi | `Janhvi` | Theme/design tokens, `components/ui` + `components/customer`, **Customer dashboard** (`screens/customer`, `hooks/customer`), customer mock data |
+| Priti  | `Priti`  | **Worker dashboard** (`screens/worker`, `components/worker`, `hooks/worker`), `components/common`/`forms`/`charts`, `services/api/*` + `apiClient.js` + `mockApi.js` |
+| Ashana | `Ashana` | Project scaffold, `navigation/*`, Auth screens + `AuthContext`, i18n, `services/native/*`, **Admin dashboard** (`screens/admin`, `components/admin`, `hooks/admin`), admin mock data |
+
+The backend team (Yash Thakur, Yash, Lokesh) does **not** work in `mobile/`; they own the API contract the mobile app consumes.
+
+## 17. Suggested delivery phases
+
+1. **Phase 0 — Scaffold:** Expo app, folder structure, NativeWind, `.env.example`, ESLint/Prettier, runs in Expo Go.
+2. **Phase 1 — Foundations:** theme tokens, base UI kit, i18n (en/hi/mr), navigation shells for all 3 roles, `apiClient` + `mockApi`, `AuthContext`, mock login + role routing, demo accounts.
+3. **Phase 2 — Role dashboards (parallel, one member each):**
+   - Customer: home → workers → profile → booking → emergency → tracking → history → rating
+   - Worker: availability → job requests → active job → earnings → profile/certificates → welfare → account status
+   - Admin: overview → verification queue → workers → bookings monitor → complaints → fair distribution → analytics/forecast → welfare programmes
+4. **Phase 3 — Cross-role wiring:** make the mock world consistent (a customer booking appears in the worker's requests and in the admin's monitor; an admin approval flips the worker's status; a customer complaint shows up in admin complaints).
+5. **Phase 4 — Native features:** real GPS, image picker, dialer/maps linking, local notification stub.
+6. **Phase 5 — Integration:** flip `EXPO_PUBLIC_USE_MOCK=false`, point at FastAPI, fix contract mismatches, swap in real auth.
+7. **Phase 6 — Polish:** low-end Android performance pass, accessibility pass, demo-ready APK via EAS Build.
+
+## 18. What NOT to do yet
+
+Do **not** implement or wire: real payment gateway (Razorpay/UPI), real Twilio, real FCM push, real Firebase/Auth0 credentials, real Google Maps API keys, on-device OCR, on-device AI/analytics computation, background location tracking, an offline-sync engine, in-app chat, bulk admin actions, admin user-management/RBAC editing, or data export. Do not eject from Expo, add TypeScript, add Redux, add a second HTTP/i18n/UI library, or introduce any dependency outside sections 4.1–4.2 without approval. Everything above is **stubbed/mocked first** — real integration comes after the demo-ready prototype works end-to-end on mock data.
+
+## 19. Definition of done (for any task)
+
+- Runs in Expo Go on Android without red screens or new yellow-box warnings.
+- No hardcoded strings (all in `en/hi/mr`), no hardcoded colors, no direct API/mock/native-module imports in screens.
+- Loading / empty / error / success states implemented wherever data is fetched; list screens paginate.
+- Role separation respected (no cross-role imports); correct role guard behaviour verified with the demo accounts.
+- Touch targets ≥ 48 dp, safe areas and keyboard handled, Android back button behaves.
+- Works in mock mode; service function signatures unchanged when the backend arrives.
+- Short note on how to test it and what was stubbed.
